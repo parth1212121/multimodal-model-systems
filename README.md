@@ -2,15 +2,17 @@
 
 Author: Parth Verma
 
-This repository contains PyTorch implementations for multimodal representation learning, vision-language question answering, and text-conditioned image generation.
+This repository contains a collection of multimodal learning systems that connect images, text, and generation. It covers three related model families: contrastive vision-text representation learning, vision-language question answering, and latent diffusion for image reconstruction and text-conditioned generation.
 
-## Modules
+The code is organized around runnable model pipelines rather than isolated model definitions. Each module includes inference entry points, artifact loading, preprocessing, and JSON-style input/output conventions so that trained components can be evaluated or composed without rewriting the surrounding infrastructure.
 
-| Module | Focus | Entry points |
+## System Overview
+
+| Module | Role in the stack | Main capabilities |
 | --- | --- | --- |
-| `contrastive_vision_text/` | CLIP-style image-text retrieval and vision encoder probing | `inference_retrieval.py`, `inference_linear_probing.py` |
-| `vision_language_qa/` | Vision-language question answering with a frozen vision encoder and LLM adapter | `inference.py` |
-| `latent_diffusion/` | VAE reconstruction and latent diffusion image generation | `inference.py` |
+| `contrastive_vision_text/` | Learns and evaluates shared image-text embeddings | CLIP-style dual encoder, ViT image backbone, text tokenizer, retrieval, frozen-feature probing |
+| `vision_language_qa/` | Connects a visual encoder to a language model interface | visual token projection, LLM adapter loading, CLEVR-style question answering |
+| `latent_diffusion/` | Builds an image generation path in latent space | convolutional VAE, U-Net denoiser, Gaussian diffusion scheduler, CLIP text conditioning |
 
 ## Repository Layout
 
@@ -29,27 +31,18 @@ This repository contains PyTorch implementations for multimodal representation l
 └── requirements.txt
 ```
 
-## Highlights
-
-- CLIP-style dual encoder for image-text retrieval.
-- Vision Transformer feature extraction with linear probes for object count and color prediction.
-- Vision-language QA pipeline that projects visual tokens into an LLM interface.
-- Convolutional VAE and latent diffusion model for reconstruction and text-conditioned generation.
-- Modular inference scripts with JSON input/output support.
-
-## Setup
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
-
-Datasets, checkpoints, adapters, and large model artifacts are expected to live outside the repository. Pass their local paths through the command-line interfaces below.
-
 ## Contrastive Vision-Text
 
-Image-to-text or text-to-image retrieval:
+The contrastive module provides a CLIP-style dual encoder for aligning image and text representations. It includes a Vision Transformer image encoder, a lightweight text encoder/tokenizer stack, model bundle loading, and retrieval utilities.
+
+Supported workflows:
+
+- Image-to-text retrieval over caption candidates.
+- Text-to-image retrieval over image candidates.
+- Feature extraction from frozen vision encoders.
+- Linear probing on frozen image features for structured visual attributes such as object count and color.
+
+Retrieval example:
 
 ```bash
 cd contrastive_vision_text
@@ -61,7 +54,7 @@ python inference_retrieval.py \
   --output_file outputs/retrieval_predictions.json
 ```
 
-Linear probing on frozen image features:
+Linear probing example:
 
 ```bash
 python inference_linear_probing.py \
@@ -75,6 +68,17 @@ python inference_linear_probing.py \
 
 ## Vision-Language QA
 
+The QA module builds a vision-language inference path by combining a frozen visual encoder, a learned projector, and an LLM adapter. The visual stream produces image tokens, the projector maps them into the language model hidden space, and the language model produces answers for image-conditioned questions.
+
+Key details:
+
+- Loads vision encoder bundles and projector checkpoints independently.
+- Supports LoRA adapter loading for the language model side.
+- Includes prompt formatting and answer normalization for compact QA outputs.
+- Operates on question JSON files with image paths and question records.
+
+Example:
+
 ```bash
 cd vision_language_qa
 python inference.py \
@@ -85,7 +89,16 @@ python inference.py \
 
 ## Latent Diffusion
 
-Reconstruct images with the VAE:
+The latent diffusion module separates image compression from conditional generation. A convolutional VAE maps images into a latent space, while a U-Net denoiser is trained to sample latents through a Gaussian diffusion process. Captions are encoded through a frozen text encoder and used as conditioning for generation.
+
+Supported workflows:
+
+- Reconstruct input images through the VAE.
+- Generate images from caption records.
+- Load model manifests, latent statistics, and checkpoint artifacts from a model directory.
+- Save generated image grids or per-sample outputs to a target directory.
+
+Reconstruction example:
 
 ```bash
 cd latent_diffusion
@@ -96,7 +109,7 @@ python inference.py \
   --output_dir outputs/reconstructions
 ```
 
-Generate images from captions:
+Generation example:
 
 ```bash
 python inference.py \
@@ -106,3 +119,12 @@ python inference.py \
   --output_dir outputs/generated
 ```
 
+## Setup
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+Datasets, pretrained models, checkpoints, LoRA adapters, tokenizer files, and generated outputs are intentionally kept outside version control. The inference scripts expect those artifacts to be supplied through `--model_dir`, `--data_path`, and output path arguments.
